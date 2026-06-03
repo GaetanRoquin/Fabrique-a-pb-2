@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fabrique à Problèmes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🧮</span>
+        <div>
+          <span class="logo-title">Fabrique à Problèmes</span>
+          <span class="logo-sub">Générateur CUA pour l'école primaire</span>
+        </div>
+      </div>
+      <button class="btn-settings" id="btnSettings" title="Paramètres API">⚙ API</button>
+    </div>
+  </header>
+
+  <!-- MODAL API KEY -->
+  <div class="modal-overlay" id="modalApi">
+    <div class="modal">
+      <h2>🔑 Clé API Gemini</h2>
+      <p>Entrez votre clé API Google Gemini pour générer de nouveaux problèmes.<br>
+      <strong>Gratuite</strong> sur <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>.<br>
+      Stockée uniquement dans votre navigateur. Laissez vide pour utiliser la base locale uniquement.</p>
+      <input type="password" id="geminiKeyInput" placeholder="AIza..." autocomplete="off" />
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btnCancelApi">Fermer</button>
+        <button class="btn-primary" id="btnSaveApi">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <main class="app-container">
+
+    <!-- ÉTAPE 1 : Paramètres -->
+    <section class="step-section" id="stepConfig">
+      <div class="step-header">
+        <span class="step-badge">1</span>
+        <h2>Paramètres de génération</h2>
+      </div>
+
+      <div class="form-grid">
+
+        <!-- Classe -->
+        <div class="form-group full-width">
+          <label>Niveau de classe</label>
+          <div class="pill-group" id="classeGroup">
+            <button class="pill" data-value="PS">Petite Section</button>
+            <button class="pill" data-value="MS">Moyenne Section</button>
+            <button class="pill" data-value="GS">Grande Section</button>
+            <button class="pill" data-value="CP">CP</button>
+            <button class="pill" data-value="CE1">CE1</button>
+            <button class="pill" data-value="CE2">CE2</button>
+            <button class="pill" data-value="CM1">CM1</button>
+            <button class="pill active" data-value="CM2">CM2</button>
+          </div>
+        </div>
+
+        <!-- Types de problèmes -->
+        <div class="form-group full-width">
+          <label>Types de problèmes <span class="hint">(plusieurs choix possibles)</span></label>
+          <div class="pill-group multi" id="typeGroup">
+            <button class="pill active" data-value="parties-tout">Parties-tout</button>
+            <button class="pill active" data-value="transformation">Transformation</button>
+            <button class="pill" data-value="groupements">Groupements</button>
+            <button class="pill" data-value="partage-equitable">Partage équitable</button>
+            <button class="pill" data-value="comparaison-additive">Comparaison additive</button>
+            <button class="pill" data-value="multiplicatif">Multiplicatif</button>
+            <button class="pill" data-value="comparaison-multiplicative">Comparaison multiplicative</button>
+            <button class="pill" data-value="produit-cartesien">Produit cartésien</button>
+            <button class="pill" data-value="denombrement">Dénombrement</button>
+            <button class="pill" data-value="optimisation">Optimisation</button>
+            <button class="pill" data-value="mixte">Mixte (2+ étapes)</button>
+          </div>
+        </div>
+
+        <!-- Nombre + Difficulté -->
+        <div class="form-group">
+          <label for="nbProblemes">Nombre de problèmes</label>
+          <div class="number-input">
+            <button class="num-btn" id="btnMinus">−</button>
+            <input type="number" id="nbProblemes" value="3" min="1" max="10" />
+            <button class="num-btn" id="btnPlus">+</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Difficulté <span class="hint">(plusieurs choix possibles)</span></label>
+          <div class="pill-group multi" id="diffGroup">
+            <button class="pill active" data-value="facile">⭐ Facile</button>
+            <button class="pill active" data-value="moyen">⭐⭐ Moyen</button>
+            <button class="pill" data-value="difficile">⭐⭐⭐ Difficile</button>
+          </div>
+        </div>
+
+        <!-- Options CUA -->
+        <div class="form-group full-width">
+          <label>Options CUA</label>
+          <div class="toggle-list">
+            <label class="toggle-item">
+              <input type="checkbox" id="optCodeCouleur" checked />
+              <span class="toggle-track"></span>
+              <span>Code couleur (données en rouge, question en vert)</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" id="optVersionsMultiples" checked />
+              <span class="toggle-track"></span>
+              <span>Versions multiples (énoncé long + simplifié + segmenté)</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" id="optModelisation" />
+              <span class="toggle-track"></span>
+              <span>Proposition de modélisation (modèle en barres)</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" id="optVieReelle" checked />
+              <span class="toggle-track"></span>
+              <span>Contexte ancré dans la vie réelle</span>
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="db-stats-bar">
+        <span id="dbStats">Chargement de la base…</span>
+        <button class="btn-clear-extra" id="btnClearExtra" title="Supprimer les problèmes générés par Gemini">🗑 Vider la base Gemini</button>
+      </div>
+
+      <div class="generate-bar">
+        <button class="btn-generate" id="btnGenerate">
+          <span class="btn-icon">✦</span>
+          Générer les problèmes
+        </button>
+      </div>
+    </section>
+
+    <!-- ÉTAPE 2 : Résultats -->
+    <section class="step-section hidden" id="stepResults">
+      <div class="step-header">
+        <span class="step-badge">2</span>
+        <h2>Sélectionner les problèmes</h2>
+        <span class="hint" id="selectionCount">0 sélectionné(s)</span>
+      </div>
+
+      <div id="problemsList"></div>
+
+      <div class="action-bar">
+        <button class="btn-secondary" id="btnRegenerate">↺ Regénérer</button>
+        <button class="btn-primary" id="btnExportWord">📄 Exporter en Word</button>
+        <button class="btn-accent" id="btnPresentation">📽 Mode Présentation</button>
+      </div>
+    </section>
+
+    <!-- CHARGEMENT -->
+    <div class="loading-overlay hidden" id="loadingOverlay">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <p id="loadingText">Génération des problèmes en cours…</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODE PRÉSENTATION -->
+  <div class="presentation-mode hidden" id="presentationMode">
+    <div class="pres-header">
+      <button class="pres-close" id="presClose">✕ Fermer</button>
+      <div class="pres-nav">
+        <button class="pres-btn" id="presPrev">◀</button>
+        <span id="presCounter">1 / 1</span>
+        <button class="pres-btn" id="presNext">▶</button>
+      </div>
+      <div class="pres-options">
+        <button class="pres-btn" id="presVersion" title="Changer de version">📖 Version</button>
+        <button class="pres-btn" id="presFullscreen" title="Plein écran">⛶</button>
+      </div>
+    </div>
+    <div class="pres-slide" id="presSlide"></div>
+  </div>
+
+  <!-- LIBRARIES -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
