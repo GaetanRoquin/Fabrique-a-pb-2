@@ -394,35 +394,103 @@ $('btnExportWord').addEventListener('click', exportWord);
 
 async function exportWord() {
   if (!selectedProblems.size) { showToast('Sélectionnez au moins un problème.', 'error'); return; }
-  const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType } = docx;
-  const children = [];
-  const stripHtml = h => h.replace(/<[^>]+>/g, '');
+  
+  // Vérifier que docx a bien chargé
+  if (!window.docx) {
+    showToast('❌ Erreur : la libraire Word n\'a pas pu charger. Rechargez la page et réessayez.', 'error');
+    console.error('[EXPORT] docx est undefined');
+    return;
+  }
 
-  children.push(new Paragraph({ text: 'Problèmes de Mathématiques', heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }));
-  children.push(new Paragraph({ text: '' }));
-
-  [...selectedProblems].sort((a, b) => a - b).forEach((idx, i) => {
-    const prob = generatedProblems[idx];
-    children.push(new Paragraph({ children: [new TextRun({ text: `Problème ${i + 1} — ${TYPES_LABELS[prob.type] || prob.type} — ${DIFF_LABELS[prob.difficulte] || ''}`, bold: true, size: 26 })] }));
-    children.push(new Paragraph({ text: '' }));
-    children.push(new Paragraph({ text: stripHtml(prob.versions?.long || ''), spacing: { line: 360 } }));
-    children.push(new Paragraph({ text: '' }));
-    if (prob.versions?.simplifie) {
-      children.push(new Paragraph({ children: [new TextRun({ text: '📖 Version simplifiée :', bold: true, size: 22 })] }));
-      children.push(new Paragraph({ text: stripHtml(prob.versions.simplifie), spacing: { line: 320 } }));
-      children.push(new Paragraph({ text: '' }));
+  try {
+    const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType } = window.docx;
+    
+    // Fallback si les classes ne sont pas disponibles
+    if (!Document || !Paragraph || !Packer) {
+      throw new Error('Classes docx manquantes. Rechargez la page.');
     }
-    children.push(new Paragraph({ border: { bottom: { color: 'CCCCCC', space: 1, value: 'single', size: 6 } } }));
-    children.push(new Paragraph({ text: '' }));
-  });
 
-  const doc  = new Document({ sections: [{ children }] });
-  const blob = await Packer.toBlob(doc);
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), { href: url, download: `problemes_maths_${new Date().toISOString().slice(0,10)}.docx` });
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('Export Word réussi ✓', 'success');
+    const children = [];
+    const stripHtml = h => h.replace(/<[^>]+>/g, '');
+
+    // Titre
+    children.push(new Paragraph({
+      text: 'Problèmes de Mathématiques',
+      heading: HeadingLevel?.HEADING_1 || undefined,
+      alignment: AlignmentType?.CENTER || undefined
+    }));
+    children.push(new Paragraph({ text: '' }));
+
+    // Chaque problème sélectionné
+    [...selectedProblems].sort((a, b) => a - b).forEach((idx, i) => {
+      const prob = generatedProblems[idx];
+      if (!prob) return;
+
+      // En-tête du problème
+      children.push(new Paragraph({
+        children: [new TextRun({
+          text: `Problème ${i + 1} — ${TYPES_LABELS[prob.type] || prob.type} — ${DIFF_LABELS[prob.difficulte] || ''}`,
+          bold: true,
+          size: 26
+        })]
+      }));
+      children.push(new Paragraph({ text: '' }));
+
+      // Texte principal
+      const mainText = prob.versions?.long || prob.enonce || '';
+      children.push(new Paragraph({
+        text: stripHtml(mainText),
+        spacing: { line: 360 }
+      }));
+      children.push(new Paragraph({ text: '' }));
+
+      // Version simplifiée si elle existe
+      if (prob.versions?.simplifie) {
+        children.push(new Paragraph({
+          children: [new TextRun({
+            text: '📖 Version simplifiée :',
+            bold: true,
+            size: 22
+          })]
+        }));
+        children.push(new Paragraph({
+          text: stripHtml(prob.versions.simplifie),
+          spacing: { line: 320 }
+        }));
+        children.push(new Paragraph({ text: '' }));
+      }
+
+      // Séparateur
+      children.push(new Paragraph({
+        border: {
+          bottom: {
+            color: 'CCCCCC',
+            space: 1,
+            value: 'single',
+            size: 6
+          }
+        }
+      }));
+      children.push(new Paragraph({ text: '' }));
+    });
+
+    // Créer et télécharger le document
+    const doc = new Document({ sections: [{ children }] });
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `problemes_maths_${new Date().toISOString().slice(0, 10)}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast(`✓ Export réussi ! ${selectedProblems.size} problème(s) exporté(s)`, 'success');
+  } catch (error) {
+    console.error('[EXPORT] Erreur lors de l\'export Word :', error);
+    showToast(`❌ Erreur lors de l\'export : ${error.message || 'Erreur inconnue'}. Rechargez la page et réessayez.`, 'error');
+  }
 }
 
 // ─── MODE PRÉSENTATION ───────────────────────────────────────────────────────

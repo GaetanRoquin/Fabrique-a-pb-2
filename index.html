@@ -191,7 +191,16 @@
   </div>
 
   <!-- LIBRARIES -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+  <script>
+    // Vérifier que docx a bien chargé
+    window.addEventListener('load', () => {
+      if (!window.docx) {
+        console.error('[DOCX] Erreur de chargement de la libraire docx');
+        document.body.insertAdjacentHTML('afterbegin', '<div style="padding:10px;background:#fee;color:#c00;border:1px solid #c00;margin:10px">⚠ Erreur : la libraire Word n\'a pas pu charger. Rechargez la page.</div>');
+      }
+    });
+  </script>
   <script src="app.js"></script>
 </body>
 </html>
