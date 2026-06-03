@@ -395,88 +395,70 @@ $('btnExportWord').addEventListener('click', exportWord);
 async function exportWord() {
   if (!selectedProblems.size) { showToast('Sélectionnez au moins un problème.', 'error'); return; }
   
-  // Vérifier que docx a bien chargé
-  if (!window.docx) {
-    showToast('❌ Erreur : la libraire Word n\'a pas pu charger. Rechargez la page et réessayez.', 'error');
-    console.error('[EXPORT] docx est undefined');
+  // Vérifier que JSZip a bien chargé
+  if (!window.JSZip) {
+    showToast('❌ Erreur : la libraire de compression n\'a pas pu charger. Rechargez la page.', 'error');
     return;
   }
 
   try {
-    const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType } = window.docx;
-    
-    // Fallback si les classes ne sont pas disponibles
-    if (!Document || !Paragraph || !Packer) {
-      throw new Error('Classes docx manquantes. Rechargez la page.');
-    }
+    showLoading('Création du document Word…');
 
-    const children = [];
     const stripHtml = h => h.replace(/<[^>]+>/g, '');
+    const JSZip = window.JSZip;
 
-    // Titre
-    children.push(new Paragraph({
-      text: 'Problèmes de Mathématiques',
-      heading: HeadingLevel?.HEADING_1 || undefined,
-      alignment: AlignmentType?.CENTER || undefined
-    }));
-    children.push(new Paragraph({ text: '' }));
+    // Créer un ZIP (la structure d'un .docx)
+    const zip = new JSZip();
 
-    // Chaque problème sélectionné
+    // Ajouter les fichiers nécessaires à la structure DOCX
+    zip.file('[Content_Types].xml', getContentTypesXml());
+    zip.file('_rels/.rels', getRelsXml());
+    zip.file('word/_rels/document.xml.rels', getDocumentRelsXml());
+
+    // Créer le contenu du document
+    let xmlContent = getDocumentHeader();
+
+    // Ajouter le titre
+    xmlContent += `<w:p><w:pPr><w:jc w:val="center"/><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>Problèmes de Mathématiques</w:t></w:r></w:p>`;
+    xmlContent += `<w:p><w:t></w:t></w:p>`;
+
+    // Ajouter chaque problème
     [...selectedProblems].sort((a, b) => a - b).forEach((idx, i) => {
       const prob = generatedProblems[idx];
       if (!prob) return;
 
+      const type = TYPES_LABELS[prob.type] || prob.type;
+      const diff = DIFF_LABELS[prob.difficulte] || '';
+      const mainText = stripHtml(prob.versions?.long || prob.enonce || '');
+      const simpText = prob.versions?.simplifie ? stripHtml(prob.versions.simplifie) : '';
+
       // En-tête du problème
-      children.push(new Paragraph({
-        children: [new TextRun({
-          text: `Problème ${i + 1} — ${TYPES_LABELS[prob.type] || prob.type} — ${DIFF_LABELS[prob.difficulte] || ''}`,
-          bold: true,
-          size: 26
-        })]
-      }));
-      children.push(new Paragraph({ text: '' }));
+      xmlContent += `<w:p><w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Problème ${i + 1} — ${type} — ${diff}</w:t></w:r></w:p>`;
+      xmlContent += `<w:p><w:t></w:t></w:p>`;
 
       // Texte principal
-      const mainText = prob.versions?.long || prob.enonce || '';
-      children.push(new Paragraph({
-        text: stripHtml(mainText),
-        spacing: { line: 360 }
-      }));
-      children.push(new Paragraph({ text: '' }));
+      xmlContent += `<w:p><w:pPr><w:spacing w:line="360"/></w:pPr><w:r><w:t>${escapeXml(mainText)}</w:t></w:r></w:p>`;
+      xmlContent += `<w:p><w:t></w:t></w:p>`;
 
       // Version simplifiée si elle existe
-      if (prob.versions?.simplifie) {
-        children.push(new Paragraph({
-          children: [new TextRun({
-            text: '📖 Version simplifiée :',
-            bold: true,
-            size: 22
-          })]
-        }));
-        children.push(new Paragraph({
-          text: stripHtml(prob.versions.simplifie),
-          spacing: { line: 320 }
-        }));
-        children.push(new Paragraph({ text: '' }));
+      if (simpText) {
+        xmlContent += `<w:p><w:r><w:rPr><w:b/><w:sz w:val="22"/></w:rPr><w:t>📖 Version simplifiée :</w:t></w:r></w:p>`;
+        xmlContent += `<w:p><w:pPr><w:spacing w:line="320"/></w:pPr><w:r><w:t>${escapeXml(simpText)}</w:t></w:r></w:p>`;
+        xmlContent += `<w:p><w:t></w:t></w:p>`;
       }
 
       // Séparateur
-      children.push(new Paragraph({
-        border: {
-          bottom: {
-            color: 'CCCCCC',
-            space: 1,
-            value: 'single',
-            size: 6
-          }
-        }
-      }));
-      children.push(new Paragraph({ text: '' }));
+      xmlContent += `<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" w:color="CCCCCC"/></w:pBdr></w:pPr><w:t></w:t></w:p>`;
+      xmlContent += `<w:p><w:t></w:t></w:p>`;
     });
 
-    // Créer et télécharger le document
-    const doc = new Document({ sections: [{ children }] });
-    const blob = await Packer.toBlob(doc);
+    xmlContent += getDocumentFooter();
+
+    zip.file('word/document.xml', xmlContent);
+
+    // Générer et télécharger
+    hideLoading();
+    const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -488,9 +470,53 @@ async function exportWord() {
 
     showToast(`✓ Export réussi ! ${selectedProblems.size} problème(s) exporté(s)`, 'success');
   } catch (error) {
+    hideLoading();
     console.error('[EXPORT] Erreur lors de l\'export Word :', error);
-    showToast(`❌ Erreur lors de l\'export : ${error.message || 'Erreur inconnue'}. Rechargez la page et réessayez.`, 'error');
+    showToast(`❌ Erreur : ${error.message || 'Erreur inconnue'}`, 'error');
   }
+}
+
+// Fonctions utilitaires pour créer la structure DOCX
+function escapeXml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function getContentTypesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+}
+
+function getRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+}
+
+function getDocumentRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`;
+}
+
+function getDocumentHeader() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>`;
+}
+
+function getDocumentFooter() {
+  return `</w:body></w:document>`;
 }
 
 // ─── MODE PRÉSENTATION ───────────────────────────────────────────────────────
